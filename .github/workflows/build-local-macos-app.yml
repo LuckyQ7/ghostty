@@ -1,6 +1,10 @@
 name: Build Local macOS App
 
 on:
+  push:
+    branches:
+      - fix/macos-ime-ctrl-c-v
+
   workflow_dispatch:
     inputs:
       optimize:
