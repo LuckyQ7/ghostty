@@ -70,6 +70,7 @@ jobs:
           nix develop -c zig build \
             --system "${{ steps.deps.outputs.path }}" \
             -Doptimize="$OPTIMIZE" \
+            -Dxcframework-target=native \
             -Demit-macos-app=false
 
       - name: Build Ghostty.app
