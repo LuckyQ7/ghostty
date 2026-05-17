@@ -41,17 +41,27 @@ jobs:
       - name: Select Xcode 26
         run: |
           set -euxo pipefail
-          if [ -d /Applications/Xcode_26.5.0.app ]; then
-            sudo xcode-select -s /Applications/Xcode_26.5.0.app
+          uname -m
+          if [ -d /Applications/Xcode_26.3.app ]; then
+            sudo xcode-select -s /Applications/Xcode_26.3.app
           elif [ -d /Applications/Xcode_26.4.1.app ]; then
             sudo xcode-select -s /Applications/Xcode_26.4.1.app
-          elif [ -d /Applications/Xcode_26.3.app ]; then
-            sudo xcode-select -s /Applications/Xcode_26.3.app
+          elif [ -d /Applications/Xcode_26.5_beta_2.app ]; then
+            sudo xcode-select -s /Applications/Xcode_26.5_beta_2.app
+          elif [ -d /Applications/Xcode_26.5.0.app ]; then
+            sudo xcode-select -s /Applications/Xcode_26.5.0.app
           else
             sudo xcode-select -s /Applications/Xcode.app
           fi
           xcodebuild -version
           xcrun --sdk macosx --show-sdk-version
+
+      - name: Install Metal Toolchain
+        run: |
+          set -euxo pipefail
+          xcodebuild -downloadComponent MetalToolchain
+          xcrun -sdk macosx --find metal
+          xcrun -sdk macosx --find metallib
 
       - name: Fetch Zig dependency cache
         id: deps
@@ -80,13 +90,17 @@ jobs:
           xcodebuild \
             -target Ghostty \
             -configuration ReleaseLocal \
+            -arch arm64 \
+            CODE_SIGN_IDENTITY=- \
+            CODE_SIGN_STYLE=Manual \
             COMPILATION_CACHE_CAS_PATH=/Users/runner/Library/Developer/Xcode/DerivedData/CompilationCache.noindex \
             COMPILATION_CACHE_KEEP_CAS_DIRECTORY=YES
 
       - name: Ad-hoc sign app
         run: |
           set -euxo pipefail
-          /usr/bin/codesign --force --deep --sign - macos/build/ReleaseLocal/Ghostty.app
+          test -d macos/build/ReleaseLocal/Ghostty.app
+          /usr/bin/codesign --force --deep --sign - --entitlements macos/GhosttyReleaseLocal.entitlements macos/build/ReleaseLocal/Ghostty.app
           /usr/bin/codesign --verify --deep --strict --verbose=2 macos/build/ReleaseLocal/Ghostty.app
 
       - name: Package app
