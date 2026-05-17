@@ -63,9 +63,13 @@ jobs:
       - name: Build GhosttyKit
         run: |
           set -euxo pipefail
+          OPTIMIZE="${{ inputs.optimize }}"
+          if [ -z "$OPTIMIZE" ]; then
+            OPTIMIZE="ReleaseFast"
+          fi
           nix develop -c zig build \
             --system "${{ steps.deps.outputs.path }}" \
-            -Doptimize=${{ inputs.optimize }} \
+            -Doptimize="$OPTIMIZE" \
             -Demit-macos-app=false
 
       - name: Build Ghostty.app
