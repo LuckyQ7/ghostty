@@ -1093,6 +1093,20 @@ extension Ghostty {
 
             let action = event.isARepeat ? GHOSTTY_ACTION_REPEAT : GHOSTTY_ACTION_PRESS
 
+            // Ctrl+C and Ctrl+V are terminal-significant controls. Some IMEs
+            // swallow or reinterpret them before they reach the terminal, so
+            // bypass the text input system for these combinations.
+            if Ghostty.SurfaceView.shouldBypassTextInputForTerminalControlInput(event) {
+                unmarkText()
+                _ = keyAction(
+                    action,
+                    event: event,
+                    translationEvent: translationEvent,
+                    composing: false
+                )
+                return
+            }
+
             // By setting this to non-nil, we note that we're in a keyDown event. From here,
             // we call interpretKeyEvents so that we can handle complex input such as Korean
             // language.
@@ -1156,7 +1170,8 @@ extension Ghostty {
                     _ = committedPreeditTextAction(action, text: text)
                 }
 
-                if shouldReplayCommittedPreeditKey(translationEvent) {
+                if Ghostty.SurfaceView.shouldAllowComposingTerminalControlInput(event, composing: composing) ||
+                    shouldReplayCommittedPreeditKey(translationEvent) {
                     _ = keyAction(
                         action,
                         event: event,
@@ -1204,10 +1219,7 @@ extension Ghostty {
                     )
                 }
             } else {
-                if Ghostty.SurfaceView.shouldAllowComposingTerminalControlInput(
-                    event.characters,
-                    composing: composing
-                ) {
+                if Ghostty.SurfaceView.shouldAllowComposingTerminalControlInput(event, composing: composing) {
                     _ = keyAction(
                         action,
                         event: event,
@@ -2113,6 +2125,40 @@ extension Ghostty.SurfaceView: NSTextInputClient {
         switch scalar.value {
         case 0x03, // Ctrl+C
              0x16: // Ctrl+V
+            return true
+        default:
+            return false
+        }
+    }
+
+    /// True when the event itself represents a terminal control key that should
+    /// bypass IME composition handling.
+    static func shouldAllowComposingTerminalControlInput(
+        _ event: NSEvent,
+        composing: Bool
+    ) -> Bool {
+        guard composing else { return false }
+        return shouldBypassTextInputForTerminalControlInput(event)
+    }
+
+    /// True when a key should be sent directly to the terminal instead of being
+    /// interpreted by AppKit's text input system.
+    static func shouldBypassTextInputForTerminalControlInput(_ event: NSEvent) -> Bool {
+        guard event.type == .keyDown,
+              event.modifierFlags.contains(.control),
+              event.modifierFlags.isDisjoint(with: [.shift, .command, .option]) else {
+            return false
+        }
+
+        if shouldAllowComposingTerminalControlInput(event.characters, composing: true) {
+            return true
+        }
+
+        let unmodified = event.charactersIgnoringModifiers ??
+            event.characters(byApplyingModifiers: [])
+
+        switch unmodified?.lowercased() {
+        case "c", "v":
             return true
         default:
             return false
